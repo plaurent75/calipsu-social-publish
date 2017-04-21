@@ -88,6 +88,19 @@ class Calipsu_Social_Publish_Admin {
 	}
 
 	/**
+	 * Add a settings link to the Plugins page
+	 */
+	function add_settings_link( $links, $file ){
+		$this_plugin = $this->plugin_name.'/'.$this->plugin_name.'.php';
+
+		if ( $file == $this_plugin ){
+			$settings_link = '<a href="options-general.php?page=calipsu-social-publish">'.__("Settings", "calipsu-social-publish").'</a>';
+			array_unshift( $links, $settings_link );
+		}
+		return $links;
+	}
+
+	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    1.0.0

@@ -30,7 +30,17 @@ class Calipsu_Social_Publish_Activator {
 	 * @since    1.0.0
 	 */
 	public static function activate() {
-
+		if ( ! function_exists ( 'curl_version' ) )
+		{
+			deactivate_plugins (basename (dirname (__FILE__)) . '/' . basename (__FILE__));
+			die( "This plugin requires the <a href='http://www.php.net/manual/en/intro.curl.php'>PHP libcurl extension</a> be installed." );
+		}
+		if ( ! version_compare( PHP_VERSION, '5.4.0', '>=' ) )
+		{
+			deactivate_plugins (basename (dirname (__FILE__)) . '/' . basename (__FILE__));
+			die( "This plugin requires the <a href='http://php.net/'>PHP 5.4</a> be installed." );
+		}
+		do_action( 'calipsu_sp_activate' );
 	}
 
 }
