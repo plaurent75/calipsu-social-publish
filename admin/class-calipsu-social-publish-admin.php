@@ -214,13 +214,15 @@ class Calipsu_Social_Publish_Admin {
 				);
 			endif;
 
+			/*Page Select*/
+			register_setting(
+				'social_publish_page_group_'.$network, // option_group
+				'social_publish_page_name_'.$network, // option_name
+				[ $this, 'social_publish_page_sanitize' ] // sanitize_callback
+			);
+
 		}
-		/*Page Select*/
-		register_setting(
-			'social_publish_page_group', // option_group
-			'social_publish_page_name', // option_name
-			[ $this, 'social_publish_page_sanitize' ] // sanitize_callback
-		);
+
 
 		add_settings_section(
 			'calipsu_social_publish_page_section', // id
@@ -313,22 +315,46 @@ class Calipsu_Social_Publish_Admin {
 							<td style="vertical-align: middle"><?php $this->get_profile($idpid) ?></td>
 							<td style="vertical-align: middle">
                                 <?php
-                                $pageoption = get_option('social_publish_page_name');
+                                $pageoption = get_option('social_publish_page_name_'.$idpid);
                                 $key = $idpid.'_calipsu_publish_page';
+                                $error = false;
                                 if($params['pagechoice'] && $pageoption && array_key_exists($key,$pageoption)) {
 	                                $currentPageId = $pageoption[$key];
-	                                $hybridauth    = new Hybrid_Auth( $this->hybrid_conf );
-	                                $adapter       = $hybridauth->authenticate( $idpid );
+	                                try {
+		                                $hybridauth = new Hybrid_Auth( $this->hybrid_conf );
+		                                $adapter    = $hybridauth->authenticate( $idpid );
+	                                }
+	                                catch(Exception $e) {
+		                                echo "<div class='error'><p>" . $e->getMessage()."</p></div>";
+		                                $error = true;
+                                    }
+	                                $thepage = false;
+                                    $pageTitle = '';
+                                    $pageLink = '';
+                                    $img ='';
 	                                switch ($idpid) {
                                         case 'Facebook':
 	                                        $thepage       = $adapter->api()->get( $currentPageId,
 		                                        $adapter->token( 'access_token' ) )->getDecodedBody();
 	                                        $pageLink = 'https://www.facebook.com/'.$thepage['id'];
 	                                        $img = 'https://graph.facebook.com/' .$thepage['id'] . '/picture?height=30&width=30';
+	                                        $pageTitle = $thepage['name'];
                                             break;
 
                                         case 'LinkedIn':
-                                            $thepage = false;
+	                                        try {
+                                                $thepage = $adapter->api()->company($currentPageId)["success"];
+                                                if($thepage){
+                                                    $lndata = $adapter->api()->company($currentPageId.'?format=json')['linkedin'];
+                                                    $pageTitle = json_decode($lndata)->name;
+                                                    $pageLink = 'https://www.linkedin.com/organization/'.json_decode($lndata)->id;
+                                                    $img = $this->get_linkedin_company_img($adapter,$currentPageId);
+                                                }
+	                                        }
+	                                        catch(Exception $e) {
+		                                        echo "<div class='error'><p>" . $e->getMessage()."</p></div>";
+		                                        $error = true;
+	                                        }
 	                                        break;
 
                                         case 'Twitter':
@@ -342,13 +368,13 @@ class Calipsu_Social_Publish_Admin {
 
                                     if($thepage) {
 	                                    echo '<table><tr><td style="vertical-align: middle;"><img  src="' . $img . '" width="30" height="30"></td>';
-	                                    echo '<td style="vertical-align: middle"><h3><a href="' . $pageLink . '" target="_blank">' . $thepage['name'] . '</a></h3></td></tr></table>';
+	                                    echo '<td style="vertical-align: middle"><h3><a href="' . $pageLink . '" target="_blank">' . $pageTitle . '</a></h3></td></tr></table>';
                                     }
                                 }elseif($params['pagechoice']){
                                 ?>
                                     Select Where to publish:<br />
                                     <?php } ?>
-                                <?php if($params['pagechoice']) { ?>
+                                <?php if($params['pagechoice'] && !$error) { ?>
                                 <p>
                                     <a href="#TB_inline?width=600&height=550&inlineId=calipsu_choice_<?php echo $idpid ?>" class="button thickbox">Select or Change</a>
                                 </p>
@@ -435,16 +461,9 @@ class Calipsu_Social_Publish_Admin {
 		    $data = json_decode($data);
 		    if($data->_total > 0){
 	            foreach ($data->values as $id => $val){
-		            $category = '';
-		            $imgSquare = '';
-
-		            $img = $linkedin->api()->company($val->id.':(square-logo-url,company-type)?format=json');
-		            if(array_key_exists('linkedin',$img)){
-                        $square = json_decode($img['linkedin']);
-                        $imgSquare = $square->squareLogoUrl;
-                        $category = $square->companyType->name;
-		            }
-	                $accounts[] = [
+		            $imgSquare = $this->get_linkedin_company_img($linkedin,$val->id );
+		            $category = $this->get_linkedin_company_cat($linkedin,$val->id );
+		            $accounts[] = [
 	                        'id' =>$val->id,
                             'name' => $val->name,
                             'category' => $category,
@@ -457,6 +476,24 @@ class Calipsu_Social_Publish_Admin {
 	   return $accounts;
     }
 
+    public function get_linkedin_company_img($adapter, $cid, $format='square-logo-url'){
+	    $imgSquare = '';
+	    $imgdata = $adapter->api()->company($cid.':('.$format.')?format=json');
+	    if(array_key_exists('linkedin',$imgdata)){
+		    $square = json_decode($imgdata['linkedin']);
+		    $imgSquare = $square->squareLogoUrl;
+	    }
+	    return $imgSquare;
+    }
+	public function get_linkedin_company_cat($adapter, $cid){
+		$category = '';
+		$catdata = $adapter->api()->company($cid.':(company-type)?format=json');
+		if(array_key_exists('linkedin',$catdata)){
+			$json = json_decode($catdata['linkedin']);
+			$category = $json->companyType->name;
+		}
+		return $category;
+	}
 	/**
 	 * List Page/Where to publish
 	 */
@@ -538,7 +575,7 @@ class Calipsu_Social_Publish_Admin {
                 <div id="calipsu_choice_<?php echo $provider ?>" style="display: none">
                     <form method="post" action="options.php">
                         <?php
-                        settings_fields( 'social_publish_page_group' );
+                        settings_fields( 'social_publish_page_group_'.$provider );
                         do_settings_sections( 'calipsu-social-publish-page' );
 		                ?>
                     <p>Publish to my <strong><?php $provider ?> Wall</strong>&nbsp;:</p>
@@ -564,13 +601,13 @@ class Calipsu_Social_Publish_Admin {
 		endif;
 	}
 	public function generate_table_account($data){
-	    $pageoption = get_option('social_publish_page_name');
-	    $provider = $data['provider'];
+		$provider = $data['provider'];
+		$pageoption = get_option('social_publish_page_name_'.$provider);
 		?>
 		<?php $checked = ( isset( $pageoption[$provider.'_calipsu_publish_page'] ) && $pageoption[$provider.'_calipsu_publish_page'] === $data['id'] ) ? 'checked' : '' ; ?>
 
 				<td class="radio">
-					<input name="social_publish_page_name[<?php echo $provider ?>_calipsu_publish_page]" type="radio" id="<?php echo $data['id'] ?>" value="<?php echo $data['id'] ?>" <?php echo $checked ?>>
+					<input name="social_publish_page_name_<?php echo $provider ?>[<?php echo $provider ?>_calipsu_publish_page]" type="radio" id="<?php echo $data['id'] ?>" value="<?php echo $data['id'] ?>" <?php echo $checked ?>>
 				</td>
 				<td class="thumbnail">
 					<label for="<?php echo $data['id'] ?>">
@@ -597,6 +634,8 @@ class Calipsu_Social_Publish_Admin {
 	 */
 	public function social_publish_page_sanitize($input) {
 		$sanitary_values = array();
+		/*var_dump($input);
+		exit;*/
 		foreach ($this->networks() as $network => $data){
 			$id = $network."_calipsu_publish_page";
 			if ( isset( $input[$id] ) ) {
