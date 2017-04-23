@@ -58,6 +58,24 @@ class Calipsu_Social_Publish {
 	protected $version;
 
 	/**
+	 * The hybrid config data.
+	 *
+	 * @since    1.0.0
+	 * @access   protected
+	 * @var      string    $hybrid_conf    Hybrid config file path.
+	 */
+	protected $hybrid_conf;
+
+	/**
+	 * The settings options data.
+	 *
+	 * @since    1.0.0
+	 * @access   private
+	 * @var      mixed    $social_publish_options    Value set for the option name.
+	 */
+	protected $social_publish_options;
+
+	/**
 	 * Define the core functionality of the plugin.
 	 *
 	 * Set the plugin name and the plugin version that can be used throughout the plugin.
@@ -70,6 +88,8 @@ class Calipsu_Social_Publish {
 
 		$this->plugin_name = 'calipsu-social-publish';
 		$this->version = '1.0.0';
+		$this->hybrid_conf = apply_filters('calipsu_hybrid_conf',dirname( dirname( __FILE__ ) ) . '/includes/config.php');
+		$this->social_publish_options = get_option( 'social_publish_option_name' );
 
 		$this->load_dependencies();
 		$this->set_locale();
@@ -100,24 +120,29 @@ class Calipsu_Social_Publish {
 		 * The class responsible for orchestrating the actions and filters of the
 		 * core plugin.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-calipsu-social-publish-loader.php';
+		require_once dirname( dirname( __FILE__ ) ) . '/includes/class-calipsu-social-publish-loader.php';
 
 		/**
 		 * The class responsible for defining internationalization functionality
 		 * of the plugin.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-calipsu-social-publish-i18n.php';
+		require_once dirname( dirname( __FILE__ ) ) . '/includes/class-calipsu-social-publish-i18n.php';
+
+		/**
+		 * The class HybridAuth
+		 */
+		require_once dirname( dirname( __FILE__ ) ) . '/includes/3rd-party/hybridauth/hybridauth/Hybrid/Auth.php';
 
 		/**
 		 * The class responsible for defining all actions that occur in the admin area.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-calipsu-social-publish-admin.php';
+		require_once dirname( dirname( __FILE__ ) ) . '/admin/class-calipsu-social-publish-admin.php';
 
 		/**
 		 * The class responsible for defining all actions that occur in the public-facing
 		 * side of the site.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-calipsu-social-publish-public.php';
+		require_once dirname( dirname( __FILE__ ) ) . '/public/class-calipsu-social-publish-public.php';
 
 		$this->loader = new Calipsu_Social_Publish_Loader();
 
@@ -149,7 +174,7 @@ class Calipsu_Social_Publish {
 	 */
 	private function define_admin_hooks() {
 
-		$plugin_admin = new Calipsu_Social_Publish_Admin( $this->get_plugin_name(), $this->get_version() );
+		$plugin_admin = new Calipsu_Social_Publish_Admin( $this->get_plugin_name(), $this->get_version(), $this->get_hybrid_conf(), $this->get_social_publish_options() );
 
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
@@ -203,6 +228,26 @@ class Calipsu_Social_Publish {
 	 */
 	public function get_loader() {
 		return $this->loader;
+	}
+
+	/**
+	 * The conf for hybrid auth.
+	 *
+	 * @since     1.0.0
+	 * @return    string    Config.php path.
+	 */
+	public function get_hybrid_conf() {
+		return $this->hybrid_conf;
+	}
+
+	/**
+	 * The options settings data.
+	 *
+	 * @since     1.0.0
+	 * @return    mixed     Value set for the option name
+	 */
+	public function get_social_publish_options() {
+		return $this->social_publish_options;
 	}
 
 	/**
